@@ -1,4 +1,5 @@
 FROM node:22-slim AS base
+# Pulse AI Radio — agent-server
 
 # --- Build stage ---
 FROM base AS builder
