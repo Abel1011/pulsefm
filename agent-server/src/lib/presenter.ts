@@ -55,7 +55,7 @@ Your broadcast style:
 - Do NOT try to cover all angles in a single turn. Explore one facet at a time in depth, then pause for more.
 - Transition between topics only when production explicitly tells you to move on.
 - You're live on air right now — act like it.
-- Speak in spanish.
+- Speak in english.
 - CRITICAL: Messages from "production" are PRIVATE internal cues — they tell you WHAT to talk about but are NOT part of the broadcast. NEVER quote, read aloud, or reference these cues directly. Transform them into natural radio commentary in your own voice and style.
 - When a listener calls in, you will hear their voice directly. Talk to them naturally like a real radio host taking a live call. Listen to what they say and respond conversationally.
 - You have a music generation tool. ONLY use it when a listener in a live call explicitly asks you to play or create music. NEVER generate music on your own — not for transitions, not for breaking news, not for segment changes, not for any editorial reason. If nobody in a call asked for music, do not use the tool.
@@ -79,6 +79,7 @@ export interface PresenterSession {
   sendCallerAudio(base64Pcm: string): void
   sendBreakingNews(headline: string, turnPrompts?: string[]): void
   sendProductionCue(message: string, turnPrompts?: string[]): void
+  sendWrapUp(): void
   interruptWithCue(message: string): void
   queueSoftInterruption(message: string): void
   setCurrentTopic(topic: string | null): void
@@ -111,54 +112,113 @@ export async function createPresenterSession(
   let currentTopic: string | null = null
   let topicTurnCount = 0
   let dynamicTurnPrompts: string[] = []
+  let intentionallyClosed = false
+  let reconnectAttempts = 0
+  const MAX_RECONNECT_ATTEMPTS = 5
+
+  // Saved topic state — restored after breaking news finishes
+  let savedTopic: { topic: string; turnCount: number; prompts: string[] } | null = null
 
   console.log('[presenter] SYSTEM INSTRUCTION:', SYSTEM_INSTRUCTION)
 
+  let session: GeminiLiveSession
+
   const sendText = (text: string) => {
     console.log(`[presenter] SEND TEXT (turn ${topicTurnCount}):`, text)
-    session.sendText(text)
+    try {
+      session.sendText(text)
+    } catch (err) {
+      console.warn('[presenter] sendText failed, session may be reconnecting:', err)
+    }
   }
 
-  const session: GeminiLiveSession = await connectGeminiLive(
-    SYSTEM_INSTRUCTION,
-    {
-      onAudio(base64Pcm) {
-        callbacks.onAudio(base64Pcm)
-      },
-      onOutputTranscript(text) {
-        transcriptBuffer += text
-        callbacks.onTranscript(text)
-      },
-      onInputTranscript(text) {
-        console.log('[caller]', text)
-      },
-      onTurnComplete() {
-        if (transcriptBuffer.trim()) {
+  async function connect(): Promise<GeminiLiveSession> {
+    return connectGeminiLive(
+      SYSTEM_INSTRUCTION,
+      {
+        onAudio(base64Pcm) {
+          callbacks.onAudio(base64Pcm)
+        },
+        onOutputTranscript(text) {
+          transcriptBuffer += text
+          callbacks.onTranscript(text)
+        },
+        onInputTranscript(text) {
+          console.log('[caller]', text)
+        },
+        onTurnComplete() {
+          if (transcriptBuffer.trim()) {
+            transcriptBuffer = ''
+          }
+          callbacks.onTurnComplete()
+        },
+        onInterrupted() {
           transcriptBuffer = ''
-        }
-        callbacks.onTurnComplete()
+          callbacks.onInterrupted()
+        },
+        onToolCall(name, id, args) {
+          callbacks.onToolCall(name, id, args)
+        },
+        onError: callbacks.onError,
+        onClose() {
+          if (intentionallyClosed) {
+            callbacks.onClose()
+            return
+          }
+          console.warn('[presenter] session closed unexpectedly, attempting reconnect...')
+          attemptReconnect()
+        },
       },
-      onInterrupted() {
-        transcriptBuffer = ''
-        callbacks.onInterrupted()
-      },
-      onToolCall(name, id, args) {
-        callbacks.onToolCall(name, id, args)
-      },
-      onError: callbacks.onError,
-      onClose: callbacks.onClose,
-    },
-    'Orus',
-    PRESENTER_TOOLS,
-  )
+      'Orus',
+      PRESENTER_TOOLS,
+    )
+  }
+
+  async function attemptReconnect() {
+    if (intentionallyClosed) return
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.error(`[presenter] failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts`)
+      callbacks.onClose()
+      return
+    }
+    reconnectAttempts++
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 16000)
+    console.log(`[presenter] reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`)
+    await new Promise((r) => setTimeout(r, delay))
+    try {
+      session = await connect()
+      console.log('[presenter] reconnected successfully')
+      reconnectAttempts = 0
+      // Resume current topic if there was one
+      if (currentTopic) {
+        sendText(
+          `[PRODUCTION — PRIVATE CUE, DO NOT READ ALOUD]\n` +
+          `You just had a brief technical interruption but you're back live. ` +
+          `Do NOT mention any interruption to listeners. Continue covering: "${currentTopic}". ` +
+          `Pick up naturally where you left off.`
+        )
+      }
+    } catch (err) {
+      console.error('[presenter] reconnect failed:', err)
+      attemptReconnect()
+    }
+  }
+
+  session = await connect()
 
   // Don't auto-start — wait for schedule/production cues
 
   return {
     sendCallerAudio(base64Pcm: string) {
-      session.sendAudio(base64Pcm)
+      try {
+        session.sendAudio(base64Pcm)
+      } catch { /* session reconnecting */ }
     },
     sendBreakingNews(headline: string, turnPrompts?: string[]) {
+      // Save current topic so we can resume after breaking news
+      if (currentTopic) {
+        savedTopic = { topic: currentTopic, turnCount: topicTurnCount, prompts: [...dynamicTurnPrompts] }
+      }
       currentTopic = headline.slice(0, 200)
       topicTurnCount = 0
       dynamicTurnPrompts = turnPrompts?.length ? turnPrompts : []
@@ -174,6 +234,7 @@ export async function createPresenterSession(
       )
     },
     sendProductionCue(message: string, turnPrompts?: string[]) {
+      savedTopic = null
       currentTopic = message.slice(0, 200)
       topicTurnCount = 0
       dynamicTurnPrompts = turnPrompts?.length ? turnPrompts : []
@@ -184,6 +245,14 @@ export async function createPresenterSession(
         `You are live on air. Use the briefing above as BACKGROUND — rephrase everything in your own words. ` +
         `Start with a compelling hook and the key context. Speak at length about this angle. ` +
         `Do NOT try to cover everything at once — you will have multiple turns to go deeper.`
+      )
+    },
+    sendWrapUp() {
+      sendText(
+        `[PRODUCTION — PRIVATE CUE, DO NOT READ ALOUD]\n` +
+        `TIME CHECK: You have approximately 30 seconds left for this segment. ` +
+        `Start wrapping up naturally — give your final thought or a quick summary, ` +
+        `then signal a smooth transition. Do NOT start a new angle or idea.`
       )
     },
     interruptWithCue(message: string) {
@@ -201,6 +270,7 @@ export async function createPresenterSession(
       currentTopic = topic ? topic.slice(0, 200) : null
       topicTurnCount = 0
       dynamicTurnPrompts = []
+      savedTopic = null
     },
     getCurrentTopicTurns() {
       return topicTurnCount
@@ -224,7 +294,9 @@ export async function createPresenterSession(
       )
     },
     respondToolCall(id: string, name: string, result: Record<string, unknown>) {
-      session.sendToolResponse(id, name, result)
+      try {
+        session.sendToolResponse(id, name, result)
+      } catch { /* session reconnecting */ }
     },
     continueStream(): ContinueResult {
       const pendingSoftInterruption = softInterruptionQueue.shift()
@@ -253,7 +325,23 @@ export async function createPresenterSession(
             `Rephrase in your own words. Speak at length about this angle. Do NOT greet or re-introduce yourself.`
           )
         } else {
-          // Topic fully covered — toss to co-host for discussion
+          // Topic fully covered
+          if (savedTopic) {
+            // Breaking news finished — resume the previous topic
+            const prev = savedTopic
+            savedTopic = null
+            currentTopic = prev.topic
+            topicTurnCount = prev.turnCount
+            dynamicTurnPrompts = prev.prompts
+            sendText(
+              `[PRODUCTION — PRIVATE CUE, DO NOT READ ALOUD]\n` +
+              `Great coverage of that breaking story. Now smoothly transition back to the topic you were covering before: "${prev.topic}".\n` +
+            `Pick up where you left off naturally — something like "Getting back to what we were covering..." or "Picking up our previous story...". ` +
+              `Do NOT re-introduce the topic from scratch — just resume your analysis from the angle you left off.`
+            )
+            return 'continued'
+          }
+          // Regular topic — toss to co-host for discussion
           currentTopic = null
           topicTurnCount = 0
           dynamicTurnPrompts = []
@@ -261,7 +349,7 @@ export async function createPresenterSession(
             `[PRODUCTION — PRIVATE CUE, DO NOT READ ALOUD]\n` +
             `You've thoroughly covered this story — great work. Give a brief wrap-up with your bottom line. ` +
             `Then toss to your co-host Nova — ask for her take on the story. ` +
-            `Something natural like "¿Qué opinas de todo esto, Nova?" or "Nova, ¿cuál es tu lectura de esta situación?". ` +
+            `Something natural like "What do you think about all this, Nova?" or "Nova, what's your take on this?". ` +
             `This should be a smooth, natural transition into a discussion with your co-host.`
           )
           return 'exhausted'
@@ -322,6 +410,7 @@ export async function createPresenterSession(
       )
     },
     close() {
+      intentionallyClosed = true
       session.close()
     },
   }

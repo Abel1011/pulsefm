@@ -9,6 +9,7 @@ import type { NewsDataScanner } from '../lib/agents/newsdata-scanner.js'
 import type { EditorAgent } from '../lib/agents/editor-agent.js'
 import type { ResearchAgent } from '../lib/agents/research-agent.js'
 import type { ArticleEnricher } from '../lib/agents/article-enricher.js'
+import type { NewsDedup } from '../lib/news-dedup.js'
 
 export interface NewsRouteDeps {
   newsStore: NewsStore
@@ -20,6 +21,7 @@ export interface NewsRouteDeps {
   editorAgent: EditorAgent
   researchAgent: ResearchAgent
   articleEnricher: ArticleEnricher
+  newsDedup?: NewsDedup
 }
 
 export function createNewsRoutes(deps: NewsRouteDeps) {
@@ -65,8 +67,17 @@ export function createNewsRoutes(deps: NewsRouteDeps) {
       .filter((r) => r.status === 'fulfilled')
       .flatMap((r) => r.value)
 
-    if (allCandidates.length > 0) {
-      await deps.newsStore.addCandidates(stationId, allCandidates)
+    let stored = allCandidates
+    let dedupStats: { duplicates: number; related: number } | undefined
+
+    if (allCandidates.length > 0 && deps.newsDedup) {
+      const dedupResult = await deps.newsDedup.deduplicate(stationId, allCandidates)
+      stored = dedupResult.unique
+      dedupStats = { duplicates: dedupResult.duplicates.length, related: dedupResult.related.length }
+    }
+
+    if (stored.length > 0) {
+      await deps.newsStore.addCandidates(stationId, stored)
     }
 
     const errors = results
@@ -75,6 +86,8 @@ export function createNewsRoutes(deps: NewsRouteDeps) {
 
     return c.json({
       found: allCandidates.length,
+      stored: stored.length,
+      dedup: dedupStats,
       errors: errors.length > 0 ? errors : undefined,
     })
   })

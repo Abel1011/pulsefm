@@ -61,7 +61,7 @@ interface BlockEditorProps {
 function defaultConfig(type: BlockType): BlockConfig {
   switch (type) {
     case "topic":
-      return { description: "", injectionType: "soft" } as TopicConfig;
+      return { description: "" } as TopicConfig;
     case "guest":
       return { name: "", expertise: "", topic: "", voice: "Aoede" } as GuestBlockConfig;
     case "music":
@@ -213,7 +213,7 @@ export default function BlockEditor({ date, block, readOnly, initialValues, onCl
                   type="time"
                   value={startTime}
                   onChange={(e) => { setStartTime(e.target.value); setStartNow(false); }}
-                  disabled={startNow}
+                  onFocus={() => setStartNow(false)}
                   className={`flex-1 min-w-0 bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text 
                     focus:outline-none focus:border-border-strong focus:ring-1 focus:ring-on-air/10 font-body
                     scheme-dark ${startNow ? 'opacity-40' : ''}`}
@@ -329,24 +329,6 @@ function TopicFields({ config, onChange }: { config: TopicConfig; onChange: (key
           className="w-full bg-surface border border-border rounded-xl px-3 py-2.5 text-sm text-text placeholder:text-text-dim 
             focus:outline-none focus:border-border-strong focus:ring-1 focus:ring-on-air/10 resize-none font-body"
         />
-      </div>
-      <div className="flex gap-2">
-        {(["soft", "breaking"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => onChange("injectionType", t)}
-            className={`flex-1 py-2 rounded-xl border text-xs font-heading font-bold tracking-wide uppercase transition-all ${
-              config.injectionType === t
-                ? t === "breaking"
-                  ? "bg-breaking/15 text-breaking border-breaking/25"
-                  : "bg-live/15 text-live border-live/25"
-                : "bg-surface text-text-dim border-border hover:bg-white/3"
-            }`}
-          >
-            {t === "breaking" ? "Breaking" : "Soft"}
-          </button>
-        ))}
       </div>
     </div>
   );

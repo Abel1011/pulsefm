@@ -23,6 +23,10 @@ export interface SchedulerDeps {
   closeCalls(): void
   /** Broadcast a WS message to all clients */
   broadcast(message: string): void
+  /** Warn presenter to wrap up (30s before block end) */
+  onWrapUp?(): void
+  /** Topic/guest finished early — fill remaining time with music */
+  onBlockFinishedEarly?(remainingMs: number): void
 }
 
 function todayDate(): string {
@@ -43,12 +47,21 @@ function addMinutes(time: string, mins: number): string {
   return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
 }
 
+function hhmmToEpochMs(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  const d = new Date()
+  d.setHours(h, m, 0, 0)
+  return d.getTime()
+}
+
 export class Scheduler {
   private interval: ReturnType<typeof setInterval> | null = null
   private deps: SchedulerDeps
   private activeBlockId: string | null = null
   private activeBlockEndTime: string | null = null
   private activeBlockType: string | null = null
+  private wrapUpTimer: ReturnType<typeof setTimeout> | null = null
+  private wrapUpFired = false
 
   constructor(deps: SchedulerDeps) {
     this.deps = deps
@@ -76,6 +89,7 @@ export class Scheduler {
     this.activeBlockId = null
     this.activeBlockEndTime = null
     this.activeBlockType = null
+    this.clearWrapUpTimer()
     console.log('[scheduler] stopped')
   }
 
@@ -87,6 +101,25 @@ export class Scheduler {
   /** Get the type of the currently active block (if any) */
   getActiveBlockType(): string | null {
     return this.activeBlockType
+  }
+
+  /** Milliseconds remaining in the active block, or 0 if none */
+  getRemainingMs(): number {
+    if (!this.activeBlockEndTime) return 0
+    const endMs = hhmmToEpochMs(this.activeBlockEndTime)
+    return Math.max(0, endMs - Date.now())
+  }
+
+  /** Notify the scheduler that the topic/guest segment content finished early */
+  notifyContentFinished(): void {
+    if (!this.activeBlockId) return
+    if (this.activeBlockType !== 'topic' && this.activeBlockType !== 'guest') return
+    const remaining = this.getRemainingMs()
+    if (remaining > 5000) {
+      this.clearWrapUpTimer()
+      console.log(`[scheduler] content finished early, ${Math.round(remaining / 1000)}s remaining`)
+      this.deps.onBlockFinishedEarly?.(remaining)
+    }
   }
 
   /** Check if there's a pending block starting within the next N minutes */
@@ -164,6 +197,11 @@ export class Scheduler {
 
     const config = block.config
 
+    // Start 30s wrap-up warning for topic/guest blocks
+    if (block.type === 'topic' || block.type === 'guest') {
+      this.startWrapUpTimer(block.durationMinutes)
+    }
+
     switch (block.type) {
       case 'topic':
         this.deps.injectTopic(config as TopicConfig)
@@ -186,6 +224,7 @@ export class Scheduler {
   }
 
   private async completeBlock(date: string, blockId: string) {
+    this.clearWrapUpTimer()
     const schedule = await this.deps.store.getSchedule(date)
     const block = schedule.blocks.find((b) => b.id === blockId)
     if (!block) return
@@ -199,12 +238,35 @@ export class Scheduler {
       this.deps.closeCalls()
     }
 
+    // Stop fill music that may be playing after early content finish
+    if (block.type === 'topic' || block.type === 'guest') {
+      this.deps.stopMusic()
+    }
+
     const updated = await this.deps.store.updateBlock(date, blockId, { status: 'completed' })
     this.activeBlockId = null
     this.activeBlockEndTime = null
     this.activeBlockType = null
     if (updated) this.broadcastBlockUpdate(blockId, updated)
     console.log(`[scheduler] completed block: ${block.title}`)
+  }
+
+  private startWrapUpTimer(durationMinutes: number) {
+    this.clearWrapUpTimer()
+    this.wrapUpFired = false
+    const warnAtMs = Math.max(0, (durationMinutes * 60 - 30) * 1000)
+    this.wrapUpTimer = setTimeout(() => {
+      this.wrapUpFired = true
+      console.log('[scheduler] 30s warning — wrap up')
+      this.deps.onWrapUp?.()
+    }, warnAtMs)
+  }
+
+  private clearWrapUpTimer() {
+    if (this.wrapUpTimer) {
+      clearTimeout(this.wrapUpTimer)
+      this.wrapUpTimer = null
+    }
   }
 
   private broadcastBlockUpdate(blockId: string, block: ScheduleBlock) {

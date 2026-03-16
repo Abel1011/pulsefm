@@ -16,6 +16,8 @@ import {
   ZoomIn,
   ZoomOut,
   Locate,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 import type {
   ScheduleBlock,
@@ -158,6 +160,7 @@ export default function ScheduleTimeline({
   const [autoFollow, setAutoFollow] = useState(true);
   const [dragBlockId, setDragBlockId] = useState<string | null>(null);
   const [dragLeft, setDragLeft] = useState(0);
+  const [autoGenerating, setAutoGenerating] = useState(false);
   const dragLeftRef = useRef(0);
   const dragMeta = useRef({ mouseX: 0, blockLeft: 0, moved: false });
   const [resizeBlockId, setResizeBlockId] = useState<string | null>(null);
@@ -407,6 +410,22 @@ export default function ScheduleTimeline({
     });
   }
 
+  async function handleAutoGenerate() {
+    if (autoGenerating) return;
+    setAutoGenerating(true);
+    try {
+      const result = await scheduleService.autoGenerate(date, { scanFirst: true });
+      if (result.blocksCreated > 0) {
+        const s = await scheduleService.fetchSchedule(date);
+        setSchedule(s);
+      }
+    } catch (err) {
+      console.error('[ScheduleTimeline] auto-generate failed:', err);
+    } finally {
+      setAutoGenerating(false);
+    }
+  }
+
   const selectedBlock = useMemo(
     () => blocks.find((b) => b.id === selectedBlockId) ?? null,
     [blocks, selectedBlockId]
@@ -555,6 +574,20 @@ export default function ScheduleTimeline({
           >
             <Plus className="w-3 h-3" />
             Add
+          </button>
+
+          <button
+            onClick={handleAutoGenerate}
+            disabled={autoGenerating}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20 disabled:opacity-50 text-[10px] font-heading font-bold tracking-wide uppercase transition-colors"
+            title="Auto-generate schedule (scans for news first)"
+          >
+            {autoGenerating ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Wand2 className="w-3 h-3" />
+            )}
+            {autoGenerating ? "Generating..." : "Auto"}
           </button>
         </div>
       </div>

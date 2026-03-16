@@ -26,6 +26,11 @@ import { EditorAgent } from './lib/agents/editor-agent.js'
 import { NewsDataScanner } from './lib/agents/newsdata-scanner.js'
 import { ResearchAgent } from './lib/agents/research-agent.js'
 import { ArticleEnricher } from './lib/agents/article-enricher.js'
+import { AutoPilot } from './lib/auto-pilot.js'
+import { NewsDedup } from './lib/news-dedup.js'
+import { SchedulePlanner } from './lib/agents/schedule-planner.js'
+import { DailyMemory } from './lib/daily-memory.js'
+import { MusicScheduler } from './lib/music-scheduler.js'
 import type { TopicConfig, GuestBlockConfig, MusicConfig } from './types/schedule.js'
 
 type TranscriptRole = 'pulse' | 'caller' | 'guest' | 'cohost' | 'producer' | 'system'
@@ -73,6 +78,9 @@ let activeLiveCallerName: string | null = null
 // Suppress auto-continue after tool responses to avoid double-prompting
 let pendingToolResponse = false
 
+// Suppress auto-continue after breaking news / direct injection to avoid crossed transmissions
+let pendingInjection = false
+
 
 
 // Transcript log (ring buffer)
@@ -84,8 +92,10 @@ let currentTranscriptChunk = ''
 const dataDir = path.resolve(import.meta.dirname, '..', 'data', 'schedules')
 const mediaDir = path.resolve(import.meta.dirname, '..', 'media')
 const scheduleStore = new JsonFileScheduleStore(dataDir)
+const dailyMemory = new DailyMemory(dataDir, scheduleStore)
 const musicPlayer = new MusicPlayer({ broadcast, mediaDir })
 const musicGenerator = new MusicGenerator(mediaDir)
+const musicScheduler = new MusicScheduler(musicGenerator)
 
 // Station and news stores + agents
 const stationsDir = path.resolve(import.meta.dirname, '..', 'data', 'stations')
@@ -130,6 +140,63 @@ const newsDataScanner = new NewsDataScanner(process.env.NEWSDATA_API_KEY ?? '')
 const researchAgent = new ResearchAgent(process.env.GOOGLE_API_KEY ?? '')
 const articleEnricher = new ArticleEnricher(process.env.GOOGLE_API_KEY ?? '')
 articleEnricher.setResearchAgent(researchAgent)
+const newsDedup = new NewsDedup(process.env.GOOGLE_API_KEY ?? '', newsDir)
+const schedulePlanner = new SchedulePlanner(process.env.GOOGLE_API_KEY ?? '', {
+  scheduleStore,
+  newsStore,
+  dailyMemory,
+})
+
+const autoPilot = new AutoPilot(
+  {
+    newsStore,
+    stationStore,
+    rssScanner,
+    redditScout,
+    trendingScout,
+    newsDataScanner,
+    editorAgent,
+    articleEnricher,
+    newsDedup,
+    onBriefsReady(stationId, briefs) {
+      if (!isOnAir || !presenter) return
+      // Auto-inject the highest-priority unsent brief
+      const best = briefs.sort((a, b) => b.priority - a.priority)[0]
+      if (!best) return
+      const turnPrompts = best.report?.turnPrompts
+      const imageUrls = best.imageUrls ?? (best.imageUrl ? [best.imageUrl] : [])
+      const headline = best.headline
+
+      const activeType = scheduler.getActiveBlockType()
+      if (activeType === 'topic') {
+        // Topic block active — queue as soft interruption if breaking
+        if (best.isBreaking) {
+          pendingInjection = true
+          presenter.sendBreakingNews(best.summary, turnPrompts)
+          pushTranscript('system', `[auto-pilot] Breaking: ${headline}`)
+          dailyMemory.addEntry(`BREAKING (auto): ${headline.slice(0, 80)}`).catch(() => {})
+        } else {
+          presenter.queueSoftInterruption(best.summary)
+          pushTranscript('system', `[auto-pilot] Queued: ${headline}`)
+        }
+      } else if (!activeType) {
+        // Idle — inject directly as production cue
+        presenter.sendProductionCue(best.summary, turnPrompts)
+        pushTranscript('system', `[auto-pilot] Topic: ${headline}`)
+      }
+      if (imageUrls.length > 0) {
+        broadcast(JSON.stringify({ type: 'news-image', imageUrl: imageUrls[0], imageUrls, headline }))
+      }
+      newsStore.sendBrief(stationId, best.id, 'auto-pilot').catch(() => {})
+
+      // Auto-generate schedule after new briefs
+      schedulePlanner.plan(stationId, musicPlayer.listTracks()).catch((err) =>
+        console.error('[auto-pilot] schedule planner error:', err),
+      )
+    },
+  },
+  { stationId: 'pulse-ai' },
+)
 
 function pushTranscript(role: TranscriptRole, text: string) {
   transcriptLog.push({ ts: Date.now(), role, text })
@@ -170,10 +237,10 @@ function triggerActiveProducer() {
   broadcast(JSON.stringify({ type: 'audio-reset' }))
 
   activeProducerSession.sendText(
-    `Interrumpe al presentador ahora mismo, de forma educada y profesional. ` +
-    `Di algo como "Perdona que te interrumpa, pero nos acaba de llegar algo importante..." ` +
-    `y luego entrega este mensaje: "${activeProducerMessage.replace(/"/g, '\\"')}". ` +
-    `Máximo 2 a 4 oraciones en total. Habla en español. Sé directa y concisa.`
+    `Interrupt the presenter right now, politely and professionally. ` +
+    `Say something like "Sorry to interrupt, but we just got something important..." ` +
+    `and then deliver this message: "${activeProducerMessage.replace(/"/g, '\\"')}". ` +
+    `Maximum 2 to 4 sentences total. Speak in english. Be direct and concise.`
   )
 
   clearProducerFallbackTimer()
@@ -226,6 +293,12 @@ async function ensurePresenter() {
         return
       }
 
+      // After breaking news / direct injection, skip one continue cycle to avoid crossed audio
+      if (pendingInjection) {
+        pendingInjection = false
+        return
+      }
+
       // While a listener is live on air, stop auto-monologuing and wait for caller audio.
       if (activeLiveCallerName) {
         return
@@ -246,7 +319,10 @@ async function ensurePresenter() {
         const result = presenter?.continueStream() ?? 'idle'
         if (result === 'exhausted') {
           // Topic just finished — start co-host discussion while presenter wraps up
-          startCohostDiscussion(lastTopicDescription)
+          startCohostDiscussion(lastTopicDescription).then(() => {
+            // If cohost didn't start (guard conditions), content is done
+            if (!cohost) scheduler.notifyContentFinished()
+          })
         }
         // 'continued' — presenter keeps talking, onTurnComplete will fire again
         // 'idle' — nothing sent, system waits for new content
@@ -403,11 +479,11 @@ async function deliverCoAnchor(message: string) {
 
   try {
     const session = await connectGeminiLive(
-      `Eres una co-presentadora de radio femenina en un show en vivo en español. ` +
-      `Recibirás instrucciones por texto para interrumpir al presentador principal. ` +
-      `Cuando recibas la instrucción, hazlo de forma breve, educada y profesional, ` +
-      `como diciendo "Perdona que te interrumpa..." seguido del mensaje. ` +
-      `Habla siempre en español. Sé concisa: máximo 2 a 4 oraciones. Luego calla.`,
+      `You are a female radio co-presenter on a live English-language show. ` +
+      `You will receive text instructions to interrupt the main presenter. ` +
+      `When you receive the instruction, do it briefly, politely, and professionally, ` +
+      `like saying "Sorry to interrupt..." followed by the message. ` +
+      `Always speak in english. Be concise: maximum 2 to 4 sentences. Then stop.`,
       {
         onAudio(base64Pcm) {
           broadcast(JSON.stringify({ type: 'audio', data: base64Pcm }))
@@ -501,6 +577,7 @@ async function startGuest(config: GuestConfig) {
   // Tell presenter to introduce the guest
   presenter?.introduceGuest(config.name, config.expertise, config.topic)
   pushTranscript('system', `Guest joined: ${config.name} (${config.expertise})`)
+  dailyMemory.addEntry(`Guest joined: ${config.name} — ${config.expertise}, topic: ${config.topic}`).catch(() => {})
   broadcast(JSON.stringify({
     type: 'guest-started',
     name: config.name,
@@ -517,7 +594,9 @@ function stopGuest() {
   currentGuestTranscriptChunk = ''
   presenter?.wrapUpGuest(name)
   pushTranscript('system', `Guest left: ${name}`)
+  dailyMemory.addEntry(`Guest left: ${name}`).catch(() => {})
   broadcast(JSON.stringify({ type: 'guest-ended' }))
+  scheduler.notifyContentFinished()
 }
 
 async function startCohostDiscussion(topic: string) {
@@ -584,6 +663,7 @@ function stopCohostDiscussion() {
   presenter?.wrapUpCohost()
   pushTranscript('system', `Co-host ${COHOST_NAME} left the discussion`)
   broadcast(JSON.stringify({ type: 'cohost-ended' }))
+  scheduler.notifyContentFinished()
 }
 
 // Health check
@@ -608,6 +688,7 @@ app.get('/radio/status', (c) => {
 app.post('/radio/stop', async (c) => {
   isOnAir = false
   await scheduler.stop()
+  autoPilot.stop()
   stopPresenter()
   broadcast(JSON.stringify({ type: 'status', presenting: false, callsOpen: false }))
   callsOpen = false
@@ -619,6 +700,7 @@ app.post('/radio/stop', async (c) => {
 app.post('/radio/start', async (c) => {
   isOnAir = true
   scheduler.start()
+  autoPilot.start()
   pushTranscript('system', 'Radio started by admin — following schedule')
   broadcast(JSON.stringify({ type: 'status', presenting: true, callsOpen }))
   return c.json({ status: 'started' })
@@ -637,9 +719,11 @@ app.post('/radio/inject', async (c) => {
 
   if (type === 'breaking') {
     if (cohost) stopCohostDiscussion()
+    pendingInjection = true
     lastTopicDescription = text.slice(0, 200)
     presenter.sendBreakingNews(text, turnPrompts)
     pushTranscript('system', `Breaking news: ${text}`)
+    dailyMemory.addEntry(`BREAKING: ${text.slice(0, 100)}`).catch(() => {})
     if (imageUrl) {
       broadcast(JSON.stringify({ type: 'news-image', imageUrl, headline: text.replace(/^BREAKING NEWS:\s*/i, '').split('.')[0] }))
     }
@@ -668,6 +752,7 @@ app.post('/radio/inject-news', async (c) => {
 
   // If a topic block is active, inject directly
   if (activeType === 'topic' && presenter) {
+    pendingInjection = true
     presenter.sendBreakingNews(text, turnPrompts)
     pushTranscript('system', `Breaking news: ${text}`)
     if (imageUrls.length > 0) {
@@ -693,7 +778,6 @@ app.post('/radio/inject-news', async (c) => {
         status: 'pending',
         config: {
           description: text,
-          injectionType: 'breaking' as const,
           imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
           turnPrompts,
         },
@@ -755,7 +839,10 @@ const scheduleRoutes = createScheduleRoutes(
   async (date, blockId) => {
     if (!isOnAir) throw new Error('Radio is not on air')
     return scheduler.executeBlock(date, blockId)
-  }
+  },
+  schedulePlanner,
+  () => musicPlayer.listTracks(),
+  autoPilot,
 )
 app.route('/schedule', scheduleRoutes)
 
@@ -770,6 +857,7 @@ const newsRoutes = createNewsRoutes({
   editorAgent,
   researchAgent,
   articleEnricher,
+  newsDedup,
 })
 app.route('/news', newsRoutes)
 
@@ -815,6 +903,23 @@ app.get('/radio/music/status', (c) => {
 
 app.get('/radio/music/list', (c) => {
   return c.json(musicGenerator.listTracks())
+})
+
+app.post('/radio/music/generate-batch', async (c) => {
+  if (musicScheduler.isGenerating()) return c.json({ error: 'A batch is already in progress' }, 409)
+  const body = await c.req.json<{ count?: number }>().catch(() => ({}))
+  const count = body.count ?? 10
+  pushTranscript('system', `Music batch generation started: ${count} tracks`)
+  musicScheduler.generateBatch(count).then((result) => {
+    pushTranscript('system', `Music batch done: ${result.generated} generated, ${result.errors} errors`)
+  }).catch((err) => {
+    console.error('[music-scheduler] batch failed:', err)
+  })
+  return c.json({ status: 'generating', count })
+})
+
+app.get('/radio/music/batch-status', (c) => {
+  return c.json({ generating: musicScheduler.isGenerating() })
 })
 
 app.post('/radio/music/play', async (c) => {
@@ -863,13 +968,22 @@ const scheduler = new Scheduler({
       broadcast(JSON.stringify({ type: 'cohost-ended' }))
     }
     lastTopicDescription = config.description.slice(0, 200)
-    if (config.injectionType === 'breaking') {
-      presenter.sendBreakingNews(config.description, config.turnPrompts)
-      pushTranscript('system', `[schedule] Breaking: ${config.description}`)
-    } else {
-      presenter.sendProductionCue(config.description, config.turnPrompts)
-      pushTranscript('system', `[schedule] Topic: ${config.description}`)
-    }
+
+    // Suppress next auto-continue so the new topic doesn't collide with the old turn
+    pendingInjection = true
+
+    // Prepend daily memory context so the presenter knows the show arc
+    dailyMemory.buildContext().then((ctx) => {
+      const fullCue = ctx
+        ? `${ctx}\n\n=== NEW TOPIC ===\n${config.description}`
+        : config.description
+      presenter!.sendProductionCue(fullCue, config.turnPrompts)
+    }).catch(() => {
+      presenter!.sendProductionCue(config.description, config.turnPrompts)
+    })
+
+    dailyMemory.addEntry(`Topic started: ${config.description.slice(0, 100)}`).catch(() => {})
+    pushTranscript('system', `[schedule] Topic: ${config.description}`)
     // Broadcast images to listeners if available
     if (config.imageUrls?.length) {
       broadcast(JSON.stringify({ type: 'news-image', imageUrl: config.imageUrls[0], imageUrls: config.imageUrls, headline: config.description.slice(0, 120) }))
@@ -921,6 +1035,18 @@ const scheduler = new Scheduler({
       presenter.sendProductionCue('The call-in segment is over. Thank the listeners for their calls and transition back to your regular coverage.')
     }
   },
+  onWrapUp() {
+    if (!presenter) return
+    presenter.sendWrapUp()
+    pushTranscript('system', '[schedule] 30s wrap-up warning sent')
+  },
+  onBlockFinishedEarly(remainingMs: number) {
+    const tracks = musicPlayer.listTracks()
+    if (tracks.length === 0) return
+    const pick = tracks[Math.floor(Math.random() * tracks.length)]
+    musicPlayer.playTrack(pick)
+    pushTranscript('system', `[schedule] Fill music: ${pick} (${Math.round(remainingMs / 1000)}s remaining)`)
+  },
   broadcast,
 })
 
@@ -956,12 +1082,14 @@ app.get(
             // Live on air — caller goes directly to presenter
             activeLiveCallerName = callerName
             ws.send(JSON.stringify({ type: 'call-accepted', mode: 'live' }))
+            pendingInjection = true
             presenter.interruptWithCue(
               `A listener named "${callerName}" just called in and is now live on air with you! ` +
               `Cut away from your current topic, welcome them warmly, confirm their name, and let them speak. ` +
               `You can hear them through the audio feed. After greeting them, pause and listen carefully instead of continuing your monologue.`
             )
             pushTranscript('system', `Caller connected live: ${callerName}`)
+            dailyMemory.addEntry(`Caller connected: ${callerName}`).catch(() => {})
           } else if (isOnAir) {
             // Lines closed but radio is on — route to screener agent
             startScreener(ws, callerName)
@@ -999,6 +1127,7 @@ const port = Number(process.env.PORT) || 3001
 
 const server = serve({ fetch: app.fetch, port }, () => {
   console.log(`Pulse agent-server running on http://localhost:${port}`)
+  musicScheduler.startDaily()
 })
 
 injectWebSocket(server)

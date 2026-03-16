@@ -37,6 +37,7 @@ export function createInitialState(): RadioState {
   return {
     isLive: false,
     isPlaying: false,
+    isBuffering: false,
     volume: 0.75,
     currentSegment: null,
     newsQueue: [],
@@ -74,7 +75,7 @@ export class MockRadioService implements RadioService {
   }
 
   togglePlay(): void {
-    this.update({ isPlaying: !this.state.isPlaying });
+    this.update({ isPlaying: !this.state.isPlaying, isBuffering: false });
   }
 
   setVolume(v: number): void {
@@ -162,10 +163,10 @@ export class WebSocketRadioService implements RadioService {
   togglePlay(): void {
     if (this.state.isPlaying) {
       this.teardownAudio();
-      this.update({ isPlaying: false });
+      this.update({ isPlaying: false, isBuffering: false });
     } else {
       this.initAudio();
-      this.update({ isPlaying: true });
+      this.update({ isPlaying: true, isBuffering: true });
     }
   }
 
@@ -217,7 +218,7 @@ export class WebSocketRadioService implements RadioService {
           this.update({ isLive: msg.presenting, callsOpen: msg.callsOpen ?? false });
           if (!msg.presenting && this.state.isPlaying) {
             this.teardownAudio();
-            this.update({ isPlaying: false, callsOpen: false });
+            this.update({ isPlaying: false, isBuffering: false, callsOpen: false });
           }
         } else if (msg.type === "calls-open") {
           this.update({ callsOpen: true });
@@ -226,13 +227,16 @@ export class WebSocketRadioService implements RadioService {
         } else if (msg.type === "audio-reset") {
           this.flushAudioQueue();
         } else if (msg.type === "audio") {
-          if (this.state.isPlaying) this.playAudioChunk(msg.data);
+          if (this.state.isPlaying) {
+            if (this.state.isBuffering) this.update({ isBuffering: false });
+            this.playAudioChunk(msg.data);
+          }
         } else if (msg.type === "interrupted") {
           this.flushAudioQueue();
         } else if (msg.type === "stopped") {
           this.flushAudioQueue();
           this.teardownAudio();
-          this.update({ isPlaying: false, isLive: false });
+          this.update({ isPlaying: false, isBuffering: false, isLive: false });
         } else if (msg.type === "call-accepted") {
           const routing = msg.mode === "live" ? "live" : "screener";
           this.update({ callerStatus: "live", callRouting: routing as CallRouting });

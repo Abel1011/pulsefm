@@ -77,6 +77,7 @@ export default function AdminPage() {
   const [blockEditorInit, setBlockEditorInit] = useState<{ type?: BlockType; title?: string; startTime?: string; durationMinutes?: number; config?: BlockConfig } | undefined>(undefined);
   const [pendingBriefId, setPendingBriefId] = useState<string | null>(null);
   const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
+  const [batchGenerating, setBatchGenerating] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
   const { entries, streaming, connected } = useTranscriptStream(
@@ -240,6 +241,37 @@ export default function AdminPage() {
       setScheduleRefreshKey((k) => k + 1);
     } catch (err) {
       console.error("[admin] add track to timeline failed:", err);
+    }
+  }
+
+  async function handleBatchGenerate() {
+    setBatchGenerating(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/radio/music/generate-batch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count: 10 }),
+      });
+      if (!res.ok) {
+        console.error("[admin] batch generate rejected:", await res.text());
+        setBatchGenerating(false);
+        return;
+      }
+      // Poll until done
+      const poll = setInterval(async () => {
+        try {
+          const sr = await fetch(`${getApiUrl()}/radio/music/batch-status`);
+          const data = await sr.json();
+          if (!data.generating) {
+            clearInterval(poll);
+            setBatchGenerating(false);
+            fetchMusicLibrary();
+          }
+        } catch { /* ignore */ }
+      }, 5000);
+    } catch (err) {
+      console.error("[admin] batch generate failed:", err);
+      setBatchGenerating(false);
     }
   }
 
@@ -620,7 +652,6 @@ export default function AdminPage() {
                   durationMinutes: 10,
                   config: {
                     description: `${brief.headline}. ${brief.summary}`,
-                    injectionType: "breaking",
                     imageUrls: brief.imageUrls,
                     turnPrompts: brief.turnPrompts,
                   } as TopicConfig,
@@ -689,6 +720,17 @@ export default function AdminPage() {
                   {musicLibrary.length} track{musicLibrary.length !== 1 ? "s" : ""}
                 </span>
               </h2>
+              <button
+                onClick={handleBatchGenerate}
+                disabled={batchGenerating}
+                title="Generate 10 tracks"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-heading font-bold tracking-wider uppercase
+                  bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20
+                  disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {batchGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Music className="w-3 h-3" />}
+                {batchGenerating ? "Generating..." : "Batch"}
+              </button>
             </div>
 
             <div className="glass rounded-2xl flex-1 min-h-0 flex flex-col overflow-hidden">

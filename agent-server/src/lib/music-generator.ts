@@ -199,14 +199,24 @@ export class MusicGenerator {
       let safetyTimer: ReturnType<typeof setTimeout> | null = null
       let setupComplete = false
       let setupResolve: (() => void) | null = null
-      const setupPromise = new Promise<void>((resolveSetup) => {
+      let setupReject: ((err: Error) => void) | null = null
+      const setupPromise = new Promise<void>((resolveSetup, rejectSetup) => {
         setupResolve = resolveSetup
+        setupReject = rejectSetup
       })
+
+      // Timeout for setup phase — avoid hanging forever
+      const setupTimer = setTimeout(() => {
+        if (!setupComplete) {
+          setupReject?.(new Error('Lyria setup timed out after 30s'))
+        }
+      }, 30_000)
 
       const finalize = () => {
         if (resolved) return
         resolved = true
         if (safetyTimer) clearTimeout(safetyTimer)
+        clearTimeout(setupTimer)
         try { session?.close?.() } catch { /* ignore */ }
 
         if (chunks.length === 0) {
@@ -306,8 +316,14 @@ export class MusicGenerator {
           },
           onclose: () => {
             console.log(`[music-gen] stream closed (chunks received: ${chunks.length}, bytes: ${totalBytes})`)
-            if (!resolved && chunks.length > 0) {
-              finalize()
+            if (!resolved) {
+              if (chunks.length > 0) {
+                finalize()
+              } else {
+                resolved = true
+                clearTimeout(setupTimer)
+                reject(new Error('Lyria session closed without sending audio data'))
+              }
             }
           },
         },

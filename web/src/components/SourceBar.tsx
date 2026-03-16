@@ -5,7 +5,6 @@ import type { SourceType } from "@/types/radio";
 import { Rss, MessageCircle } from "lucide-react";
 
 const sourceIcons: Record<SourceType, React.ReactNode> = {
-  twitter: <span className="font-heading text-[10px] font-bold">X</span>,
   rss: <Rss className="w-3 h-3" />,
   reddit: <MessageCircle className="w-3 h-3" />,
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRadio } from "./RadioProvider";
-import { Play, Pause, Volume2, Volume1, VolumeX } from "lucide-react";
+import { Play, Pause, Volume2, Volume1, VolumeX, Loader2 } from "lucide-react";
 import { useRef, useCallback, useEffect, useState } from "react";
 
 export default function PlayButton() {
@@ -11,9 +11,11 @@ export default function PlayButton() {
     <button
       onClick={() => service.togglePlay()}
       className="w-16 h-16 sm:w-20 sm:h-20 rounded-full glass-strong flex items-center justify-center text-text/80 hover:text-on-air transition-all duration-300 hover:scale-105 active:scale-95"
-      aria-label={state.isPlaying ? "Pause" : "Play"}
+      aria-label={state.isBuffering ? "Buffering" : state.isPlaying ? "Pause" : "Play"}
     >
-      {state.isPlaying ? (
+      {state.isBuffering ? (
+        <Loader2 className="w-6 h-6 sm:w-7 sm:h-7 animate-spin text-on-air" strokeWidth={1.5} />
+      ) : state.isPlaying ? (
         <Pause className="w-6 h-6 sm:w-7 sm:h-7" strokeWidth={1.5} />
       ) : (
         <Play className="w-6 h-6 sm:w-7 sm:h-7 ml-1" strokeWidth={1.5} />

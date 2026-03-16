@@ -1,6 +1,6 @@
 export type ConfidenceLevel = "confirmed" | "developing" | "rumor";
 
-export type SourceType = "twitter" | "rss" | "reddit";
+export type SourceType = "rss" | "reddit";
 
 export type CallerStatus = "idle" | "connecting" | "live" | "ended";
 
@@ -49,6 +49,7 @@ export interface SourceStatus {
 export interface RadioState {
   isLive: boolean;
   isPlaying: boolean;
+  isBuffering: boolean;
   volume: number;
   currentSegment: ShowSegment | null;
   newsQueue: NewsItem[];

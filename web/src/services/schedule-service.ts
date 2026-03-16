@@ -72,3 +72,22 @@ export async function fetchTracks(): Promise<string[]> {
   const data = await res.json()
   return data.tracks ?? []
 }
+
+export async function autoGenerate(
+  date: string,
+  opts?: { windowHours?: number; scanFirst?: boolean }
+): Promise<{ blocksCreated: number }> {
+  const res = await fetch(`${getApiUrl()}/schedule/${date}/auto-generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      windowHours: opts?.windowHours,
+      scanFirst: opts?.scanFirst,
+    }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Auto-generation failed' }))
+    throw new Error(err.error || 'Auto-generation failed')
+  }
+  return res.json()
+}

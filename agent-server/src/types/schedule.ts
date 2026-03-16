@@ -1,6 +1,5 @@
 export interface TopicConfig {
   description: string
-  injectionType: 'breaking' | 'soft'
   sources?: string[]
   imageUrls?: string[]
   turnPrompts?: string[]
