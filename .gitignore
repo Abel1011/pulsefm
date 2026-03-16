@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+
+# Copilot / AI instructions
+.github/
+MEMORY.md
+
+# Agent server data (runtime state)
+agent-server/data/
+agent-server/media/*.wav
+
+# Next.js
+next-env.d.ts
+.vercel
+
+# Misc
+*.pem
+/coverage

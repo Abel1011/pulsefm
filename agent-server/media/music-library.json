@@ -1,0 +1,235 @@
+[
+  {
+    "filename": "ai-peruvian-music-1773547588478.wav",
+    "prompt": "Peruvian music",
+    "durationSeconds": 30,
+    "createdAt": 1773547588480,
+    "enhancedPrompts": [
+      {
+        "text": "Peruvian music",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "filename": "ai-peruvian-music-1773548036679.wav",
+    "prompt": "peruvian music",
+    "durationSeconds": 60,
+    "createdAt": 1773548036680,
+    "enhancedPrompts": [
+      {
+        "text": "peruvian music",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "filename": "ai-m-sica-chicha-1773548166500.wav",
+    "prompt": "música chicha",
+    "durationSeconds": 60,
+    "createdAt": 1773548166508,
+    "enhancedPrompts": [
+      {
+        "text": "música chicha",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "filename": "ai-musica-chicha-1773548252175.wav",
+    "prompt": "musica chicha",
+    "durationSeconds": 60,
+    "createdAt": 1773548252177,
+    "enhancedPrompts": [
+      {
+        "text": "musica chicha",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "filename": "ai-musica-chicha-1773549461958.wav",
+    "prompt": "Musica chicha",
+    "durationSeconds": 30,
+    "createdAt": 1773549461966,
+    "enhancedPrompts": [
+      {
+        "text": "Musica chicha",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "filename": "ai-reggae-1773549538970.wav",
+    "prompt": "REGGAE",
+    "durationSeconds": 30,
+    "createdAt": 1773549538971,
+    "enhancedPrompts": [
+      {
+        "text": "REGGAE",
+        "weight": 1
+      }
+    ]
+  },
+  {
+    "filename": "ai-reggae-1773549621248.wav",
+    "prompt": "reggae",
+    "durationSeconds": 30,
+    "createdAt": 1773549621249,
+    "enhancedPrompts": [
+      {
+        "text": "classic roots reggae rhythm with prominent offbeat guitar skank and deep pulsating sub-bass",
+        "weight": 1
+      },
+      {
+        "text": "warm vintage drum kit with syncopated rimshots and organic wooden percussion",
+        "weight": 0.8
+      },
+      {
+        "text": "laid-back island groove with melodic Hammond B3 organ stabs and soulful brass sections",
+        "weight": 0.7
+      },
+      {
+        "text": "analog tape saturation, spacious reverb on snares, and dub-inspired echo delays",
+        "weight": 0.6
+      },
+      {
+        "text": "relaxed rhythmic feel, steady four-on-the-floor kick pattern with heavy syncopation",
+        "weight": 0.5
+      }
+    ]
+  },
+  {
+    "filename": "ai-musica-chicha-1773549732433.wav",
+    "prompt": "musica chicha",
+    "durationSeconds": 30,
+    "createdAt": 1773549732434,
+    "enhancedPrompts": [
+      {
+        "text": "Peruvian Chicha music, electric guitar with heavy spring reverb and surf-rock tremolo picking style",
+        "weight": 1
+      },
+      {
+        "text": "cumbia rhythm, syncopated percussion, timbales, cowbell, and güiro",
+        "weight": 0.9
+      },
+      {
+        "text": "tropical psychedelic rock influence, vintage 1970s analog synth leads, warm organ textures",
+        "weight": 0.8
+      },
+      {
+        "text": "driving melodic bassline, steady rhythmic foundation, danceable groove",
+        "weight": 0.7
+      },
+      {
+        "text": "lo-fi analog warmth, bright guitar tones, energetic festive atmosphere",
+        "weight": 0.6
+      }
+    ]
+  },
+  {
+    "filename": "ai-musica-chicha-con-letra-sobre-la-indepen-1773549943560.wav",
+    "prompt": "musica chicha con letra sobre la independencia del Perú",
+    "durationSeconds": 30,
+    "createdAt": 1773549943561,
+    "enhancedPrompt": "An upbeat, nostalgic Chicha song celebrating the Peruvian independence, featuring the signature bright, reverb-drenched psychedelic electric guitar melodies layered with hypnotic cumbia rhythms. The instrumentation includes a driving, syncopated bassline, energetic Latin percussion with congas, guiro, and cowbell, and a retro Farfisa organ adding psychedelic textures. The vocal style is emotive and patriotic, with lyrics centered on themes of freedom and national pride. The production features a warm, analog grit reminiscent of 1970s Amazonian cumbia recordings, blending surf-rock influence with Andean melodic motifs."
+  },
+  {
+    "filename": "ai-musica-chicha-con-letra-sobre-la-indepen-1773550083783.wav",
+    "prompt": "musica chicha con letra sobre la independencia del Perú",
+    "durationSeconds": 30,
+    "createdAt": 1773550083784,
+    "enhancedPrompt": "musica chicha con letra sobre la independencia del Perú"
+  },
+  {
+    "filename": "ai-aaaaa-1773604619995.wav",
+    "prompt": "aaaaa",
+    "durationSeconds": 60,
+    "createdAt": 1773604620004,
+    "enhancedPrompt": "aaaaa"
+  },
+  {
+    "filename": "ai-dramatic-high-energy-synth-instrumental-1773620215998.wav",
+    "prompt": "Dramatic, high-energy synth instrumental with a sense of urgency and futuristic undertones, perfect for a breaking news segment.",
+    "durationSeconds": 60,
+    "createdAt": 1773620216000,
+    "enhancedPrompt": "Dramatic, high-energy synth instrumental with a sense of urgency and futuristic undertones, perfect for a breaking news segment."
+  },
+  {
+    "filename": "ai-energetic-and-futuristic-electronic-musi-1773620239774.wav",
+    "prompt": "Energetic and futuristic electronic music with a driving beat, suitable for a tech news update about Meta's AI developments.",
+    "durationSeconds": 60,
+    "createdAt": 1773620239776,
+    "enhancedPrompt": "Energetic and futuristic electronic music with a driving beat, suitable for a tech news update about Meta's AI developments."
+  },
+  {
+    "filename": "ai-pulsating-electronic-track-with-a-sense-1773620255561.wav",
+    "prompt": "Pulsating electronic track with a sense of financial energy and high stakes, suitable for discussing a major tech IPO and market shifts.",
+    "durationSeconds": 60,
+    "createdAt": 1773620255563,
+    "enhancedPrompt": "Pulsating electronic track with a sense of financial energy and high stakes, suitable for discussing a major tech IPO and market shifts."
+  },
+  {
+    "filename": "ai-dramatic-high-energy-synth-beat-for-bre-1773622134314.wav",
+    "prompt": "Dramatic, high-energy synth beat for breaking news",
+    "durationSeconds": 60,
+    "createdAt": 1773622134315,
+    "enhancedPrompt": "Urgent, cinematic news broadcast underscore with a propulsive, driving rhythm and sharp, cutting synthetic percussion. The soundscape features tension-building arpeggiated basslines, metallic textures, and sweeping orchestral stabs that convey a sense of immediate gravity and global importance. A modern, high-tech aesthetic with a fast-paced, relentless energy designed to command attention."
+  },
+  {
+    "filename": "ai-dramatic-high-energy-synth-instrumental-1773622204989.wav",
+    "prompt": "Dramatic, high-energy synth instrumental with a sense of urgency and breaking news feel",
+    "durationSeconds": 60,
+    "createdAt": 1773622204990,
+    "enhancedPrompt": "A high-stakes, cinematic electronic track characterized by driving, pulsating analog basslines and sharp, staccato synthesizer stabs that evoke a sense of immediate tension. The rhythm is relentless and fast-paced, featuring crisp, rapid-fire percussion elements that mirror the intensity of a breaking news broadcast. The atmosphere is cold, urgent, and technically precise, incorporating shimmering, high-frequency arpeggios that build an overwhelming sense of momentum and critical anticipation."
+  },
+  {
+    "filename": "ai-energetic-electronic-music-synth-lead-1773623543558.wav",
+    "prompt": "energetic electronic music, synth lead, driving beat",
+    "durationSeconds": 60,
+    "createdAt": 1773623543559,
+    "enhancedPrompt": "A high-energy, modern electronic dance track featuring pulsing, bright synthesizer leads that cut through the mix with infectious rhythmic energy. The soundscape is characterized by a driving, propulsive four-on-the-floor beat, layered with shimmering textures, crisp percussion, and a forward-moving, euphoric atmosphere perfect for peak-time dancefloors."
+  },
+  {
+    "filename": "ai-funky-bassline-upbeat-drums-retro-synt-1773623560156.wav",
+    "prompt": "funky bassline, upbeat drums, retro synth",
+    "durationSeconds": 60,
+    "createdAt": 1773623560157,
+    "enhancedPrompt": "An infectious, groove-heavy funk track featuring a prominent, slap-style bassline that locks into a syncopated pocket. The rhythm section is driven by crisp, energetic 70s-style drum machine beats with a natural, punchy swing. The atmosphere is layered with warm, oscillating retro analog synthesizers, utilizing sawtooth waves and classic filter sweeps to create a nostalgic, neon-soaked dance floor vibe. The mood is high-energy, infectious, and undeniably vibrant."
+  },
+  {
+    "filename": "ai-chill-lo-fi-hip-hop-with-jazz-elements-1773623567154.wav",
+    "prompt": "chill lo-fi hip hop with jazz elements",
+    "durationSeconds": 60,
+    "createdAt": 1773623567156,
+    "enhancedPrompt": "a mellow and dusty lo-fi hip hop track featuring soft, jazz-infused piano chords and smooth, melodic electric guitar licks. the atmosphere is nostalgic and cozy, built upon a laid-back, swinging boom-bap drum beat with crackling vinyl surface noise. the harmonic structure is rich with jazzy seventh chords, creating a relaxed, introspective, and late-night coffee shop vibe."
+  },
+  {
+    "filename": "ai-aggressive-synth-bass-fast-tempo-cyber-1773623573835.wav",
+    "prompt": "aggressive synth bass, fast tempo, cyberpunk mood",
+    "durationSeconds": 60,
+    "createdAt": 1773623573836,
+    "enhancedPrompt": "A high-octane industrial cyberpunk soundscape defined by a distorted, snarling synth bass that pulses with mechanical precision. The atmosphere is dark and neon-drenched, featuring glitchy rhythmic textures, cold metallic percussion, and an unrelenting, driving intensity. The mood is futuristic and menacing, evoking a gritty urban dystopia with expansive, echoing synth layers that create a sense of claustrophobic urgency."
+  },
+  {
+    "filename": "ai-startups-1773623674318.wav",
+    "prompt": "startups",
+    "durationSeconds": 60,
+    "createdAt": 1773623674319,
+    "enhancedPrompt": "Modern, forward-thinking corporate electronic music with a clean, high-tech aesthetic. Features a steady, driving rhythmic pulse, subtle atmospheric synths, and a polished, professional tone. The sound is optimistic, energetic, and focused, characterized by crisp percussion, rhythmic arpeggiated synths, and an open, airy production style that conveys innovation, growth, and digital efficiency."
+  },
+  {
+    "filename": "ai-energetic-electronic-news-intro-sting-1773627288203.wav",
+    "prompt": "energetic electronic news intro sting",
+    "durationSeconds": 60,
+    "createdAt": 1773627288211,
+    "enhancedPrompt": "A high-energy, cutting-edge electronic news broadcast ident featuring sharp, rhythmic synthesized pulses, glitchy digital textures, and an authoritative, driving momentum. The sonic landscape is clean, polished, and futuristic, characterized by crisp percussion and shimmering, upward-sweeping harmonic motifs that evoke a sense of urgency, precision, and global connectivity."
+  },
+  {
+    "filename": "ai-energetic-electronic-news-intro-sting-1773627354498.wav",
+    "prompt": "energetic electronic news intro sting",
+    "durationSeconds": 60,
+    "createdAt": 1773627354500,
+    "enhancedPrompt": "A high-energy, modern electronic news broadcast introduction. Featuring crisp, rhythmic synthetic pulses, driving glitch-influenced percussion, and soaring, cinematic synth stabs. The atmosphere is urgent, professional, and authoritative, with a clean digital texture and a forward-moving, polished production style that conveys breaking news and global connectivity."
+  }
+]
