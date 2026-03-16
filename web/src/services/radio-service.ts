@@ -144,7 +144,12 @@ export class WebSocketRadioService implements RadioService {
 
   constructor(wsUrl?: string) {
     this.state = createInitialState();
-    this.wsUrl = wsUrl ?? `ws://${typeof window !== "undefined" ? window.location.hostname : "localhost"}:3001/ws/radio`;
+    if (wsUrl) {
+      this.wsUrl = wsUrl;
+    } else {
+      const base = API_URL.replace(/^http/, "ws");
+      this.wsUrl = `${base}/ws/radio`;
+    }
     // Connect immediately for status updates
     this.connectWs();
   }
