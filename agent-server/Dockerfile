@@ -15,7 +15,8 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
@@ -23,8 +24,7 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist/ dist/
 COPY media/ media/
 
-# Data dirs (ephemeral on Cloud Run, persistent with volume mounts)
-RUN mkdir -p data/schedules data/stations data/news
+RUN mkdir -p data
 
 EXPOSE 3001
 CMD ["node", "dist/index.js"]
