@@ -165,6 +165,12 @@ export function useTranscriptStream(
             }
             break;
           }
+
+          case "transcript-clear": {
+            streamingRef.current = null;
+            setState((prev) => ({ ...prev, entries: [], streaming: null }));
+            break;
+          }
         }
       } catch {
         // Ignore malformed

@@ -826,6 +826,8 @@ app.post('/radio/reset', async (c) => {
     DELETE FROM daily_memory;
     DELETE FROM op_locks;
   `)
+  transcriptLog.length = 0
+  broadcast(JSON.stringify({ type: 'transcript-clear' }))
   await seedDefaultStation()
   return c.json({ status: 'reset' })
 })
@@ -1217,8 +1219,6 @@ app.get(
         if (msg.type === 'caller-audio') {
           if (callsOpen && presenter) {
             presenter.sendCallerAudio(msg.data)
-          } else if (screener) {
-            screener.sendCallerAudio(msg.data)
           }
         } else if (msg.type === 'call-start') {
           if (callerWs && callerWs !== ws) {
@@ -1240,8 +1240,8 @@ app.get(
             pushTranscript('system', `Caller connected live: ${callerName}`)
             dailyMemory.addEntry(`Caller connected: ${callerName}`).catch(() => {})
           } else if (isOnAir) {
-            // Lines closed but radio is on — route to screener agent
-            startScreener(ws, callerName)
+            ws.send(JSON.stringify({ type: 'call-rejected', reason: 'Phone lines are closed right now. Try again during the call-in segment!' }))
+            callerWs = null
           } else {
             ws.send(JSON.stringify({ type: 'call-rejected', reason: 'radio is off air' }))
           }

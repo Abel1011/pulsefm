@@ -464,7 +464,7 @@ export default function AdminPage() {
                   onChange={(e) => setInjectText(e.target.value)}
                   placeholder={
                     injectType === "breaking"
-                      ? "e.g. ElevenLabs just launched a new real-time voice cloning API"
+                      ? "e.g. ust launched a new real-time voice cloning API"
                       : injectType === "co-anchor"
                         ? "e.g. I think there's another angle to this story worth exploring"
                         : "e.g. Send a shoutout to our listeners"
