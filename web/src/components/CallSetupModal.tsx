@@ -1,23 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Mic, Video, X, Phone } from "lucide-react";
-import type { CallMode } from "@/types/radio";
+import { Mic, X, Phone } from "lucide-react";
 
 interface Props {
-  onStart: (name: string, mode: CallMode) => void;
+  onStart: (name: string) => void;
   onClose: () => void;
 }
 
 export default function CallSetupModal({ onStart, onClose }: Props) {
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<CallMode>("audio");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    onStart(trimmed, mode);
+    onStart(trimmed);
   }
 
   return (
@@ -73,41 +71,10 @@ export default function CallSetupModal({ onStart, onClose }: Props) {
             />
           </div>
 
-          {/* Mode selector */}
-          <div>
-            <label className="block font-heading text-[11px] font-bold tracking-wider uppercase text-text-muted mb-2">
-              Call type
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setMode("audio")}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all duration-200 ${
-                  mode === "audio"
-                    ? "bg-on-air/10 border-on-air/30 text-on-air"
-                    : "bg-white/3 border-white/8 text-text-muted hover:border-white/15"
-                }`}
-              >
-                <Mic className="w-4 h-4" strokeWidth={1.5} />
-                <span className="font-heading text-xs font-bold tracking-wide">
-                  Audio
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("video")}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-all duration-200 ${
-                  mode === "video"
-                    ? "bg-on-air/10 border-on-air/30 text-on-air"
-                    : "bg-white/3 border-white/8 text-text-muted hover:border-white/15"
-                }`}
-              >
-                <Video className="w-4 h-4" strokeWidth={1.5} />
-                <span className="font-heading text-xs font-bold tracking-wide">
-                  Video
-                </span>
-              </button>
-            </div>
+          {/* Mode indicator */}
+          <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-on-air/10 border border-on-air/30 text-on-air">
+            <Mic className="w-4 h-4" strokeWidth={1.5} />
+            <span className="font-heading text-xs font-bold tracking-wide">Audio call</span>
           </div>
 
           {/* Submit */}

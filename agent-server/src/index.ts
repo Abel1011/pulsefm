@@ -1206,6 +1206,10 @@ app.get(
             screener.sendCallerAudio(msg.data)
           }
         } else if (msg.type === 'call-start') {
+          if (callerWs && callerWs !== ws) {
+            ws.send(JSON.stringify({ type: 'call-rejected', reason: 'Another caller is already on the line' }))
+            return
+          }
           callerWs = ws
           const callerName = msg.name ?? 'listener'
           if (callsOpen && presenter) {

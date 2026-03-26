@@ -48,6 +48,7 @@ export function createInitialState(): RadioState {
     callRouting: "none",
     currentStation: PULSE_STATION,
     callsOpen: false,
+    callRejectedReason: null,
     newsImage: null,
   };
 }
@@ -241,8 +242,8 @@ export class WebSocketRadioService implements RadioService {
           const routing = msg.mode === "live" ? "live" : "screener";
           this.update({ callerStatus: "live", callRouting: routing as CallRouting });
         } else if (msg.type === "call-rejected") {
-          this.update({ callerStatus: "ended", callRouting: "none" });
-          setTimeout(() => this.update({ callerStatus: "idle", callerName: "", callerMode: "audio", callRouting: "none" }), 1500);
+          this.update({ callerStatus: "ended", callRouting: "none", callRejectedReason: msg.reason || "Call rejected" });
+          setTimeout(() => this.update({ callerStatus: "idle", callerName: "", callerMode: "audio", callRouting: "none", callRejectedReason: null }), 3000);
         } else if (msg.type === "screener-audio") {
           // Play screener audio to the caller
           if (this.state.callerStatus === "live" && this.state.callRouting === "screener") {

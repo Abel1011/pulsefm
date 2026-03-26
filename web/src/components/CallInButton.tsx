@@ -1,21 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRadio } from "./RadioProvider";
-import { Phone, PhoneOff } from "lucide-react";
+import { Phone, PhoneOff, AlertCircle } from "lucide-react";
 import CallSetupModal from "./CallSetupModal";
-import type { CallMode } from "@/types/radio";
 
 export default function CallInButton() {
   const { state, service } = useRadio();
   const [showSetup, setShowSetup] = useState(false);
+  const [rejectedMsg, setRejectedMsg] = useState<string | null>(null);
 
   const isInCall = state.callerStatus === "connecting" || state.callerStatus === "live";
   const visible = state.isLive && (isInCall || state.callerStatus === "idle");
 
-  function handleCallStart(name: string, mode: CallMode) {
+  useEffect(() => {
+    if (state.callRejectedReason) {
+      setRejectedMsg(state.callRejectedReason);
+      const t = setTimeout(() => setRejectedMsg(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [state.callRejectedReason]);
+
+  function handleCallStart(name: string) {
     setShowSetup(false);
-    service.startCall(name, mode);
+    service.startCall(name, "audio");
   }
 
   return (
@@ -47,6 +55,14 @@ export default function CallInButton() {
           onStart={handleCallStart}
           onClose={() => setShowSetup(false)}
         />
+      )}
+
+      {/* Rejection toast */}
+      {rejectedMsg && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl glass-strong border border-on-air/30 text-on-air animate-fade-in-up">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="font-heading text-xs font-bold tracking-wide">{rejectedMsg}</span>
+        </div>
       )}
     </>
   );

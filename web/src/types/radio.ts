@@ -60,5 +60,6 @@ export interface RadioState {
   callRouting: CallRouting;
   currentStation: Station;
   callsOpen: boolean;
+  callRejectedReason: string | null;
   newsImage: { url: string; headline: string; imageUrls?: string[] } | null;
 }
