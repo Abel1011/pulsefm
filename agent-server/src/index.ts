@@ -95,6 +95,8 @@ let activeProducerFallbackTimer: ReturnType<typeof setTimeout> | null = null
 
 // Phone lines state — controlled by presenter AI via tool calls
 let callsOpen = false
+let callsMode: 'auto' | 'scheduled' | null = null
+let autoCallsCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 // Screener session — handles callers when phone lines are closed
 let screener: ScreenerSession | null = null
@@ -305,6 +307,21 @@ function broadcast(message: string) {
   }
 }
 
+function clearAutoCallsCloseTimer() {
+  if (!autoCallsCloseTimer) return
+  clearTimeout(autoCallsCloseTimer)
+  autoCallsCloseTimer = null
+}
+
+function closePhoneLines(reason: string, transcriptMessage?: string) {
+  clearAutoCallsCloseTimer()
+  callsOpen = false
+  callsMode = null
+  activeLiveCallerName = null
+  broadcast(JSON.stringify({ type: 'calls-closed', reason }))
+  if (transcriptMessage) pushTranscript('system', transcriptMessage)
+}
+
 async function ensurePresenter() {
   if (!isOnAir) return null
   if (presenter) return presenter
@@ -378,7 +395,9 @@ async function ensurePresenter() {
           if (remainingMs > MIN_CALLIN_MS && !callsOpen) {
             // Enough time left — open phone lines for listener discussion
             const topic = lastTopicDescription || 'the latest story'
+            clearAutoCallsCloseTimer()
             callsOpen = true
+            callsMode = 'auto'
             broadcast(JSON.stringify({ type: 'calls-open', reason: `Open discussion: ${topic}` }))
             pushTranscript('system', `[auto] Phone lines opened for discussion (${Math.round(remainingMs / 60000)}min remaining)`)
             if (presenter) {
@@ -391,12 +410,10 @@ async function ensurePresenter() {
 
             // Auto-close calls 90s before block ends to leave room for wrap-up
             const closeDelay = Math.max(0, remainingMs - 90_000)
-            setTimeout(() => {
-              if (!callsOpen) return
-              callsOpen = false
-              activeLiveCallerName = null
-              broadcast(JSON.stringify({ type: 'calls-closed', reason: 'segment ending soon' }))
-              pushTranscript('system', '[auto] Phone lines closed — segment ending soon')
+            autoCallsCloseTimer = setTimeout(() => {
+              autoCallsCloseTimer = null
+              if (!callsOpen || callsMode !== 'auto') return
+              closePhoneLines('segment ending soon', '[auto] Phone lines closed — segment ending soon')
               startCohostDiscussion(lastTopicDescription).then(() => {
                 if (!cohost) scheduler.notifyContentFinished()
               })
@@ -440,19 +457,24 @@ async function ensurePresenter() {
         // Respond immediately so the presenter keeps talking
         presenter?.respondToolCall(id, name, {
           status: 'generating',
-          message: `Music is being generated for: "${prompt}". This will take about ${durationSeconds ?? 60} seconds. Keep broadcasting — you will receive a production note when the track is ready.`,
+          message: `Music is being generated for: "${prompt}". This will take about ${durationSeconds ?? 60} seconds. Stay focused on the caller and only mention the result if it is directly relevant to what they asked for.`,
         })
 
         // Generate in background
         musicGenerator.generate({ prompt, durationSeconds }).then((result) => {
           console.log(`[music-gen] complete: ${result.filename}`)
           pushTranscript('system', `AI music track generated: "${result.prompt}" (${result.durationSeconds}s) → ${result.filename}`)
-          presenter?.sendProductionCue(
+          const readyNote =
             `Great news! The AI-generated music track is ready. ` +
             `Title/style: "${result.prompt}". Duration: ${result.durationSeconds} seconds. ` +
             `Filename: ${result.filename}. ` +
             `Let the audience know the track was just created by AI and is available for the music hour.`
-          )
+
+          if (activeLiveCallerName) {
+            presenter?.queueSoftInterruption(readyNote)
+          } else {
+            presenter?.sendProductionCue(readyNote)
+          }
         }).catch((err) => {
           console.error('[music-gen] failed:', err)
           presenter?.queueSoftInterruption(
@@ -498,6 +520,8 @@ function stopPresenter() {
     resetProducerState()
   }
   stopScreener()
+  clearAutoCallsCloseTimer()
+  callsMode = null
   if (presenter) {
     presenter.close()
     presenter = null
@@ -840,6 +864,8 @@ app.post('/radio/stop', async (c) => {
   stopPresenter()
   broadcast(JSON.stringify({ type: 'status', presenting: false, callsOpen: false }))
   callsOpen = false
+  callsMode = null
+  clearAutoCallsCloseTimer()
   broadcast(JSON.stringify({ type: 'calls-closed', reason: 'radio stopped' }))
   return c.json({ status: 'stopped' })
 })
@@ -1164,7 +1190,9 @@ const scheduler = new Scheduler({
     pushTranscript('system', `[schedule] Break: ${message}`)
   },
   openCalls(topic?: string) {
+    clearAutoCallsCloseTimer()
     callsOpen = true
+    callsMode = 'scheduled'
     broadcast(JSON.stringify({ type: 'calls-open', reason: topic ?? 'scheduled call-in segment' }))
     pushTranscript('system', `[schedule] Phone lines opened${topic ? `: ${topic}` : ''}`)
     if (presenter) {
@@ -1175,9 +1203,7 @@ const scheduler = new Scheduler({
     }
   },
   closeCalls() {
-    callsOpen = false
-    broadcast(JSON.stringify({ type: 'calls-closed', reason: 'scheduled segment ended' }))
-    pushTranscript('system', '[schedule] Phone lines closed')
+    closePhoneLines('scheduled segment ended', '[schedule] Phone lines closed')
     if (presenter) {
       presenter.sendProductionCue('The call-in segment is over. Thank the listeners for their calls and transition back to your regular coverage.')
     }
